@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+.turbo
+pnpm-lock.yaml
+packages/db/prisma/migrations
+# Legacy code (reference only, removed in Phase 4)
+api-server
+build-server
+s3-reverse-proxy
+frontend-nextjs
+static

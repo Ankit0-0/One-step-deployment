@@ -170,6 +170,16 @@ describe.skipIf(!hasInfra)('deployments', () => {
     const res = await agent.get(`/deployments/${d.id}/logs`).query({ after, limit: 1 }).expect(200);
     expect(res.body.logs.map((l: DeploymentLogDto) => l.message)).toEqual(['m1']);
     await agent.get(`/deployments/${d.id}/logs`).query({ limit: 0 }).expect(400);
+
+    // id cursor pages through lines that share a timestamp.
+    const all = (await agent.get(`/deployments/${d.id}/logs`).expect(200)).body
+      .logs as DeploymentLogDto[];
+    const page = await agent
+      .get(`/deployments/${d.id}/logs`)
+      .query({ afterId: all[0]!.id, limit: 1 })
+      .expect(200);
+    expect(page.body.logs.map((l: DeploymentLogDto) => l.message)).toEqual(['m1']);
+    await agent.get(`/deployments/${d.id}/logs`).query({ afterId: 'abc' }).expect(400);
   });
 
   it('ignores invalid transitions, duplicate events and forged channels', async () => {

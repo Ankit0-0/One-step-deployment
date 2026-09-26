@@ -106,10 +106,18 @@ export class DeploymentsRepository {
     });
   }
 
-  logs(deploymentId: string, options: { after?: Date; limit: number }): Promise<DeploymentLog[]> {
+  /** Logs in arrival order (ids are assigned as the ingestor persists them, in publish order). */
+  logs(
+    deploymentId: string,
+    options: { after?: Date; afterId?: bigint; limit: number },
+  ): Promise<DeploymentLog[]> {
     return this.prisma.deploymentLog.findMany({
-      where: { deploymentId, ...(options.after && { ts: { gt: options.after } }) },
-      orderBy: [{ ts: 'asc' }, { id: 'asc' }],
+      where: {
+        deploymentId,
+        ...(options.after && { ts: { gt: options.after } }),
+        ...(options.afterId !== undefined && { id: { gt: options.afterId } }),
+      },
+      orderBy: { id: 'asc' },
       take: options.limit,
     });
   }

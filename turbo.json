@@ -7,7 +7,8 @@
     },
     "build": {
       "dependsOn": ["^build", "generate"],
-      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "env": ["NEXT_PUBLIC_*"]
     },
     "typecheck": {
       "dependsOn": ["^build", "generate"]
@@ -18,9 +19,10 @@
     "test": {
       "dependsOn": ["^build", "generate"],
       "outputs": ["coverage/**"],
-      "passThroughEnv": ["DATABASE_URL"]
+      "passThroughEnv": ["DATABASE_URL", "REDIS_URL", "TEST_LOG_LEVEL"]
     },
     "dev": {
+      "dependsOn": ["^build", "generate"],
       "cache": false,
       "persistent": true
     }

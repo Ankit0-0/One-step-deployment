@@ -1,0 +1,10 @@
+{
+  "extends": "@osd/tsconfig/node.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": ["*.ts", "tests"]
+}

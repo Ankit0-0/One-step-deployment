@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/.turbo
+**/.next
+**/coverage
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.github
+e2e/.artifacts
+infra/aws/out

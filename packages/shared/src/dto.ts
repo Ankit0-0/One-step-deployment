@@ -106,8 +106,13 @@ export const rollbackBodySchema = z.object({ deploymentId: idSchema }).strict();
 export type RollbackBody = z.infer<typeof rollbackBodySchema>;
 
 export const logsQuerySchema = z.object({
-  /** Return logs strictly after this ISO timestamp (for resuming a tail). */
+  /** Return logs strictly after this ISO timestamp. */
   after: isoDate.optional(),
+  /** Return logs with an id greater than this one (stable cursor for paging). */
+  afterId: z
+    .string()
+    .regex(/^\d{1,19}$/)
+    .optional(),
   limit: z.coerce.number().int().min(1).max(5000).default(1000),
 });
 export type LogsQuery = z.infer<typeof logsQuerySchema>;

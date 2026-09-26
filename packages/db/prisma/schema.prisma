@@ -2,7 +2,11 @@
 // Migrations live in ./migrations; create new ones with `pnpm --filter @osd/db migrate:dev`.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Generated inside this package so `pnpm deploy` ships it with @osd/db.
+  output        = "../generated/client"
+  // native for dev/CI, musl for the alpine api/proxy images.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -74,6 +78,8 @@ model Deployment {
   startedAt    DateTime?
   finishedAt   DateTime?
   durationMs   Int?
+  /// Runner handle (ECS task ARN or Docker container id) used to stop the build on cancel.
+  runnerRef    String?
 
   project   Project         @relation("ProjectDeployments", fields: [projectId], references: [id], onDelete: Cascade)
   currentOf Project?        @relation("CurrentDeployment")

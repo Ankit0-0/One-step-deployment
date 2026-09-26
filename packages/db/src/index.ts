@@ -1,6 +1,6 @@
-import { PrismaClient, type Prisma } from '@prisma/client';
+import { PrismaClient, type Prisma } from '../generated/client/index.js';
 
-export * from '@prisma/client';
+export * from '../generated/client/index.js';
 
 export interface CreatePrismaClientOptions {
   /** Defaults to DATABASE_URL from the environment. */

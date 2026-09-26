@@ -1,0 +1,34 @@
+{
+	email {$ACME_EMAIL}
+}
+
+# One wildcard certificate (DNS-01 through Route53) covers the dashboard, the api and every site.
+# "app" and "api" are reserved slugs, so they can never collide with a project.
+*.{$ROOT_DOMAIN} {
+	tls {
+		dns route53
+	}
+
+	encode zstd gzip
+
+	@app host app.{$ROOT_DOMAIN}
+	handle @app {
+		reverse_proxy web:3000
+	}
+
+	@api host api.{$ROOT_DOMAIN}
+	handle @api {
+		# Prometheus scrapes the api from inside the network; keep /metrics off the internet.
+		respond /metrics 404
+		reverse_proxy api:4000
+	}
+
+	handle {
+		reverse_proxy proxy:8000
+	}
+}
+
+# Bare domain → dashboard.
+{$ROOT_DOMAIN} {
+	redir https://app.{$ROOT_DOMAIN}{uri}
+}

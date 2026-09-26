@@ -3,7 +3,9 @@
 #   docker compose --env-file .env -f infra/docker-compose.yml up -d
 #
 # Default: postgres, redis, minio (+ bucket bootstrap).
-# `--profile apps` also starts api, proxy and web (their Dockerfiles land in Phase 2/3).
+# `--profile apps` also starts api and proxy (run `pnpm db:migrate` first and create
+# apps/api/.env + apps/proxy/.env from their .env.example files).
+# Builds run in osd/build-worker:local containers: `docker compose ... build build-worker`.
 
 name: osd
 
@@ -87,9 +89,16 @@ services:
 
   api:
     profiles: ['apps']
+    image: osd/api:local
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
+    # Local DockerRunner starts build containers through the Docker Engine API.
+    # Dev only: access to the Docker socket is root-equivalent on the host.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - '${DOCKER_GID:-0}'
     env_file:
       - path: ../apps/api/.env
         required: false
@@ -109,6 +118,7 @@ services:
 
   proxy:
     profiles: ['apps']
+    image: osd/proxy:local
     build:
       context: ..
       dockerfile: apps/proxy/Dockerfile
@@ -129,20 +139,64 @@ services:
       minio-init:
         condition: service_completed_successfully
 
+  # Image only; the api starts one container per deployment.
+  build-worker:
+    profiles: ['build']
+    image: osd/build-worker:local
+    build:
+      context: ..
+      dockerfile: apps/build-worker/Dockerfile
+
   web:
-    profiles: ['apps']
+    profiles: ['web']
+    image: osd/web:local
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
-    env_file:
-      - path: ../apps/web/.env
-        required: false
+      # Inlined into the browser bundle; must be URLs the browser can reach.
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+        NEXT_PUBLIC_ROOT_DOMAIN: ${NEXT_PUBLIC_ROOT_DOMAIN:-localhost:8000}
     ports:
       - '127.0.0.1:3000:3000'
     depends_on:
       - api
 
+  # Metrics: docker compose ... --profile apps --profile monitoring up -d
+  # Prometheus on :9090, Grafana on :3001 (admin / GRAFANA_ADMIN_PASSWORD).
+  prometheus:
+    profiles: ['monitoring']
+    image: prom/prometheus:v3.5.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - '127.0.0.1:9090:9090'
+
+  grafana:
+    profiles: ['monitoring']
+    image: grafana/grafana:12.1.1
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me-grafana}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/osd-overview.json
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - '127.0.0.1:3001:3000'
+    depends_on:
+      - prometheus
+
 volumes:
   postgres-data:
   redis-data:
   minio-data:
+  prometheus-data:
+  grafana-data:

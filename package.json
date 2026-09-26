@@ -8,16 +8,22 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "dev": "turbo run dev --filter=@osd/api --filter=@osd/proxy --filter=@osd/web",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "setup:env": "node scripts/setup-env.mjs",
     "db:generate": "pnpm --filter @osd/db generate",
     "db:migrate": "pnpm --filter @osd/db migrate:deploy",
     "db:seed": "pnpm --filter @osd/db seed",
     "infra:up": "docker compose --env-file .env -f infra/docker-compose.yml up -d",
-    "infra:down": "docker compose --env-file .env -f infra/docker-compose.yml down"
+    "infra:down": "docker compose --env-file .env -f infra/docker-compose.yml down",
+    "test:e2e": "pnpm --filter @osd/e2e test:e2e",
+    "stack:up": "docker compose --env-file .env -f infra/docker-compose.yml --profile build build build-worker && docker compose --env-file .env -f infra/docker-compose.yml --profile apps --profile web up -d --build",
+    "stack:down": "docker compose --env-file .env -f infra/docker-compose.yml --profile apps --profile web --profile monitoring down",
+    "monitoring:up": "docker compose --env-file .env -f infra/docker-compose.yml --profile apps --profile monitoring up -d"
   },
   "devDependencies": {
     "prettier": "^3.6.2",

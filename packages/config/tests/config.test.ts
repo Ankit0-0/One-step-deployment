@@ -72,6 +72,15 @@ describe('loadApiEnv', () => {
     expectInvalid(() => loadApiEnv({ ...apiBase, STORAGE_DRIVER: 'gcs' }), 'STORAGE_DRIVER');
   });
 
+  it('allows the mock runner outside production only', () => {
+    const env = loadApiEnv({ ...apiBase, BUILD_RUNNER: 'mock' });
+    expect(env.BUILD_RUNNER === 'mock' && env.MOCK_BUILD_STEP_MS).toBe(400);
+    expectInvalid(
+      () => loadApiEnv({ ...apiBase, BUILD_RUNNER: 'mock', NODE_ENV: 'production' }),
+      'BUILD_RUNNER',
+    );
+  });
+
   it('requires ECS settings when BUILD_RUNNER=ecs', () => {
     expectInvalid(
       () => loadApiEnv({ ...apiBase, BUILD_RUNNER: 'ecs' }),

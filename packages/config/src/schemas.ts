@@ -85,10 +85,29 @@ const dockerRunner = z.object({
   BUILD_RUNNER: z.literal('docker'),
   BUILD_WORKER_IMAGE: z.string().min(1).default('osd/build-worker:local'),
   DOCKER_NETWORK: z.string().min(1).optional(),
+  /** Redis/S3 addresses as seen from inside the worker container, when they differ from the api's. */
+  WORKER_REDIS_URL: redisUrl.optional(),
+  WORKER_S3_ENDPOINT: z.url().optional(),
+  WORKER_MEMORY: z.string().default('2g'),
+  WORKER_CPUS: z.string().default('1'),
 });
 
-/** BUILD_RUNNER=ecs runs builds as Fargate tasks; docker runs them locally for dev/tests. */
-export const runnerSchema = z.discriminatedUnion('BUILD_RUNNER', [ecsRunner, dockerRunner]);
+/** Simulated builds (no container, no git) for e2e tests and UI work; refused in production. */
+const mockRunner = z.object({
+  BUILD_RUNNER: z.literal('mock'),
+  /** Delay between simulated build steps. */
+  MOCK_BUILD_STEP_MS: z.coerce.number().int().min(0).max(10_000).default(400),
+});
+
+/**
+ * BUILD_RUNNER=ecs runs builds as Fargate tasks; docker runs them locally for dev/tests;
+ * mock simulates them without running anything.
+ */
+export const runnerSchema = z.discriminatedUnion('BUILD_RUNNER', [
+  ecsRunner,
+  dockerRunner,
+  mockRunner,
+]);
 
 const emailConsole = z.object({
   EMAIL_DRIVER: z.literal('console'),
@@ -122,12 +141,28 @@ export const apiEnvSchema = baseSchema
     COOKIE_SECURE: envBoolean.default(true),
     COOKIE_DOMAIN: z.string().min(1).optional(),
     ROOT_DOMAIN: z.string().min(1),
+    /** Public URL of a project; {slug} is replaced. Defaults to https://{slug}.{ROOT_DOMAIN}. */
+    SITE_URL_TEMPLATE: z
+      .string()
+      .refine((v) => v.includes('{slug}'), 'must contain {slug}')
+      .optional(),
     MAX_CONCURRENT_BUILDS_PER_USER: z.coerce.number().int().min(1).default(2),
     TRUST_PROXY: envBoolean.default(false),
+    /** When set, GET /metrics requires `Authorization: Bearer <token>`. */
+    METRICS_TOKEN: z.string().min(16).optional(),
+    BUILD_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(10 * 60 * 1000),
   })
   .and(storageSchema)
   .and(runnerSchema)
-  .and(emailSchema);
+  .and(emailSchema)
+  .refine((env) => !(env.NODE_ENV === 'production' && env.BUILD_RUNNER === 'mock'), {
+    message: 'BUILD_RUNNER=mock is for development and tests only',
+    path: ['BUILD_RUNNER'],
+  });
 
 /** The build worker never receives database credentials. */
 export const workerEnvSchema = baseSchema
@@ -157,6 +192,8 @@ export const proxyEnvSchema = baseSchema
     PORT: port.default(8000),
     ROOT_DOMAIN: z.string().min(1),
     CACHE_TTL_SECONDS: z.coerce.number().int().min(1).default(30),
+    METRICS_TOKEN: z.string().min(16).optional(),
+    TRUST_PROXY: envBoolean.default(false),
   })
   .and(storageSchema);
 

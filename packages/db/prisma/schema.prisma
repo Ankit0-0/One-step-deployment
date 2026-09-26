@@ -1,0 +1,96 @@
+// One-step-deployment data model.
+// Migrations live in ./migrations; create new ones with `pnpm --filter @osd/db migrate:dev`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DeploymentStatus {
+  QUEUED
+  BUILDING
+  UPLOADING
+  READY
+  FAILED
+  CANCELED
+}
+
+enum LogLevel {
+  debug
+  info
+  warn
+  error
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  createdAt DateTime  @default(now())
+  projects  Project[]
+}
+
+/// One-time login code. Only a hash of the code is stored.
+model AuthCode {
+  id         String    @id @default(cuid())
+  email      String
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, createdAt])
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  slug      String   @unique
+  gitUrl    String
+  createdAt DateTime @default(now())
+
+  /// Latest READY deployment served by the proxy. Moving it back is a rollback.
+  currentDeploymentId String?     @unique
+  currentDeployment   Deployment? @relation("CurrentDeployment", fields: [currentDeploymentId], references: [id], onDelete: SetNull)
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deployments Deployment[] @relation("ProjectDeployments")
+
+  @@index([userId, createdAt])
+}
+
+model Deployment {
+  id           String           @id @default(cuid())
+  projectId    String
+  status       DeploymentStatus @default(QUEUED)
+  commitSha    String?
+  errorMessage String?
+  createdAt    DateTime         @default(now())
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  durationMs   Int?
+
+  project   Project         @relation("ProjectDeployments", fields: [projectId], references: [id], onDelete: Cascade)
+  currentOf Project?        @relation("CurrentDeployment")
+  logs      DeploymentLog[]
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([status])
+}
+
+model DeploymentLog {
+  id           BigInt   @id @default(autoincrement())
+  deploymentId String
+  ts           DateTime
+  level        LogLevel @default(info)
+  message      String
+
+  deployment Deployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+
+  @@index([deploymentId, ts])
+}

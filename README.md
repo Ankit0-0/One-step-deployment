@@ -1,4 +1,29 @@
-# Vercel Clone
+# One-step deployment
+
+> **Rewrite in progress.** The repo is moving to a TypeScript monorepo (pnpm + turborepo).
+> Phase 1 (this layout, shared packages, local infra, CI) is in place; the apps land in later phases.
+> The legacy folders (`api-server`, `build-server`, `s3-reverse-proxy`, `frontend-nextjs`) are kept
+> for reference until Phase 4. The full README (architecture, env reference, AWS guide) comes in Phase 4.
+
+```
+apps/        api, build-worker, proxy, web (Phase 2/3; only .env.example today)
+packages/    config (zod env loading), shared (DTOs, events, pino logger), db (Prisma), tsconfig, eslint-config
+infra/       docker-compose.yml (postgres, redis, minio)
+```
+
+### Local setup (Node 22, pnpm 10, Docker)
+
+```sh
+pnpm install
+cp .env.example .env && cp packages/db/.env.example packages/db/.env
+pnpm infra:up
+pnpm db:migrate && pnpm db:seed
+pnpm lint && pnpm typecheck && pnpm test && pnpm build
+```
+
+---
+
+## Legacy: Vercel Clone
 
 YouTube Video Link: https://youtu.be/0A_JpLYG7hM
 

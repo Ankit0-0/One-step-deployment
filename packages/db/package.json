@@ -1,0 +1,46 @@
+{
+  "name": "@osd/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "prisma"
+  ],
+  "scripts": {
+    "generate": "prisma generate",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:status": "prisma migrate status",
+    "seed": "tsx prisma/seed.ts",
+    "studio": "prisma studio"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "~6.19.0"
+  },
+  "devDependencies": {
+    "@osd/eslint-config": "workspace:*",
+    "@osd/tsconfig": "workspace:*",
+    "@types/node": "^22.18.0",
+    "eslint": "^9.39.1",
+    "prisma": "~6.19.0",
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

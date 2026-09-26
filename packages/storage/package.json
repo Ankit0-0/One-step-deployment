@@ -1,0 +1,37 @@
+{
+  "name": "@osd/storage",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.920.0",
+    "@osd/config": "workspace:*",
+    "mime-types": "^3.0.1"
+  },
+  "devDependencies": {
+    "@osd/eslint-config": "workspace:*",
+    "@osd/tsconfig": "workspace:*",
+    "@types/mime-types": "^3.0.1",
+    "@types/node": "^22.18.0",
+    "eslint": "^9.39.1",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

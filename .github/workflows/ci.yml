@@ -34,10 +34,15 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://osd:osd-ci-password@localhost:5432/osd?schema=public
+      REDIS_URL: redis://:osd-ci-redis@localhost:6379
       TURBO_TELEMETRY_DISABLED: '1'
 
     steps:
       - uses: actions/checkout@v4
+
+      # Service containers can't take a command, and Redis must require a password.
+      - name: Start Redis
+        run: docker run -d --name redis -p 6379:6379 redis:7-alpine redis-server --requirepass osd-ci-redis
 
       - uses: pnpm/action-setup@v4
 
@@ -66,3 +71,21 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        app: [api, proxy, build-worker]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.app }} image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: false
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}

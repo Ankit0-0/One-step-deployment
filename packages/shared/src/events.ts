@@ -57,3 +57,6 @@ export const SOCKET_EVENTS = {
 
 export const joinDeploymentPayloadSchema = z.object({ deploymentId: idSchema });
 export type JoinDeploymentPayload = z.infer<typeof joinDeploymentPayloadSchema>;
+
+/** Redis key the proxy caches slug → current deployment under; the api deletes it on change. */
+export const proxySlugCacheKey = (slug: string) => `proxy:slug:${slug}` as const;

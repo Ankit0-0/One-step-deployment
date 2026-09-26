@@ -3,7 +3,9 @@
 #   docker compose --env-file .env -f infra/docker-compose.yml up -d
 #
 # Default: postgres, redis, minio (+ bucket bootstrap).
-# `--profile apps` also starts api, proxy and web (their Dockerfiles land in Phase 2/3).
+# `--profile apps` also starts api and proxy (run `pnpm db:migrate` first and create
+# apps/api/.env + apps/proxy/.env from their .env.example files).
+# Builds run in osd/build-worker:local containers: `docker compose ... build build-worker`.
 
 name: osd
 
@@ -87,9 +89,16 @@ services:
 
   api:
     profiles: ['apps']
+    image: osd/api:local
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
+    # Local DockerRunner starts build containers through the Docker Engine API.
+    # Dev only: access to the Docker socket is root-equivalent on the host.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - '${DOCKER_GID:-0}'
     env_file:
       - path: ../apps/api/.env
         required: false
@@ -109,6 +118,7 @@ services:
 
   proxy:
     profiles: ['apps']
+    image: osd/proxy:local
     build:
       context: ..
       dockerfile: apps/proxy/Dockerfile
@@ -129,8 +139,17 @@ services:
       minio-init:
         condition: service_completed_successfully
 
+  # Image only; the api starts one container per deployment.
+  build-worker:
+    profiles: ['build']
+    image: osd/build-worker:local
+    build:
+      context: ..
+      dockerfile: apps/build-worker/Dockerfile
+
+  # Phase 3.
   web:
-    profiles: ['apps']
+    profiles: ['web']
     build:
       context: ..
       dockerfile: apps/web/Dockerfile

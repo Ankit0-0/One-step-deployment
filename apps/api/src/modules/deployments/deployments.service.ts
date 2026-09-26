@@ -49,11 +49,12 @@ export class DeploymentsService {
   async logs(
     userId: string,
     id: string,
-    query: { after?: string; limit: number },
+    query: { after?: string; afterId?: string; limit: number },
   ): Promise<DeploymentLogDto[]> {
     if (!(await this.isOwner(userId, id))) throw notFound('Deployment');
     const rows = await this.deps.repo.logs(id, {
       after: query.after ? new Date(query.after) : undefined,
+      afterId: query.afterId !== undefined ? BigInt(query.afterId) : undefined,
       limit: query.limit,
     });
     return rows.map(toLogDto);

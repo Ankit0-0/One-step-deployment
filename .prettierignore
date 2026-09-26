@@ -11,3 +11,4 @@ s3-reverse-proxy
 frontend-nextjs
 static
 packages/db/generated
+next-env.d.ts

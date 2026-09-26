@@ -1,13 +1,13 @@
 # One-step deployment
 
 > **Rewrite in progress.** The repo is moving to a TypeScript monorepo (pnpm + turborepo).
-> Phases 1–2 are in place (shared packages, local infra, CI, and the api, build-worker and proxy);
-> the web dashboard lands in Phase 3.
+> Phases 1–3 are in place (shared packages, local infra, CI, the api, build-worker and proxy, and
+> the web dashboard); monitoring, e2e tests and the AWS setup land in Phase 4.
 > The legacy folders (`api-server`, `build-server`, `s3-reverse-proxy`, `frontend-nextjs`) are kept
 > for reference until Phase 4. The full README (architecture, env reference, AWS guide) comes in Phase 4.
 
 ```
-apps/        api (REST + socket.io), build-worker (Docker image), proxy (subdomain → storage), web (Phase 3)
+apps/        api (REST + socket.io), build-worker (Docker image), proxy (subdomain → storage), web (Next.js)
 packages/    config (zod env loading), shared (DTOs, events, logger, http helpers), db (Prisma),
              storage (S3/MinIO), tsconfig, eslint-config
 infra/       docker-compose.yml (postgres, redis, minio)
@@ -29,6 +29,13 @@ Run the services locally (api on :4000, proxy on :8000, sites at `http://{slug}.
 cp apps/api/.env.example apps/api/.env && cp apps/proxy/.env.example apps/proxy/.env
 docker compose --env-file .env -f infra/docker-compose.yml --profile build build build-worker
 docker compose --env-file .env -f infra/docker-compose.yml --profile apps up -d --build
+```
+
+Then the dashboard on :3000, either in compose or with hot reload:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml --profile web up -d --build
+# or: cp apps/web/.env.example apps/web/.env.local && pnpm --filter @osd/web dev
 ```
 
 With `EMAIL_DRIVER=console`, login codes are printed in the api log (`docker compose ... logs api`).

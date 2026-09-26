@@ -1,0 +1,10 @@
+{
+  "extends": "@osd/tsconfig/nextjs.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["vitest/globals", "@testing-library/jest-dom"]
+  },
+  "include": ["next-env.d.ts", "src", "tests", ".next/types/**/*.ts", "*.ts", "*.mjs"],
+  "exclude": ["node_modules", ".next"]
+}

@@ -3,15 +3,19 @@ import { Redis } from 'ioredis';
 import { loadApiEnv, type ApiEnv } from '@osd/config';
 import { createPrismaClient } from '@osd/db';
 import { createLogger, type Logger } from '@osd/shared/logger';
-import { S3ObjectStore } from '@osd/storage';
+import { S3ObjectStore, type ObjectStore } from '@osd/storage';
 import { createContext } from './context.js';
 import { ConsoleEmailSender, ResendEmailSender, type EmailSender } from './modules/auth/email.js';
 import { DockerRunner } from './modules/runners/docker-runner.js';
 import { EcsRunner } from './modules/runners/ecs-runner.js';
+import { MockRunner, type EventSink } from './modules/runners/mock-runner.js';
 import type { BuildRunner } from './modules/runners/runner.js';
 import { startApi } from './server.js';
 
-function createRunner(env: ApiEnv): BuildRunner {
+function createRunner(env: ApiEnv, deps: { sink: EventSink; store: ObjectStore }): BuildRunner {
+  if (env.BUILD_RUNNER === 'mock') {
+    return new MockRunner({ ...deps, stepMs: env.MOCK_BUILD_STEP_MS });
+  }
   if (env.BUILD_RUNNER === 'ecs') {
     return new EcsRunner(new ECSClient({ region: env.AWS_REGION }), {
       cluster: env.ECS_CLUSTER,
@@ -67,6 +71,7 @@ async function main() {
   redis.on('error', (err) => logger.warn({ err }, 'redis error'));
   subscriber.on('error', (err) => logger.warn({ err }, 'redis subscriber error'));
   const prisma = createPrismaClient();
+  const store = S3ObjectStore.fromEnv(env);
 
   const ctx = createContext({
     config: {
@@ -85,8 +90,8 @@ async function main() {
     logger,
     prisma,
     redis,
-    store: S3ObjectStore.fromEnv(env),
-    runner: createRunner(env),
+    store,
+    runner: createRunner(env, { sink: redis, store }),
     email: createEmail(env, logger),
   });
 
@@ -100,6 +105,7 @@ async function main() {
     { port: env.PORT, runner: env.BUILD_RUNNER, storage: env.STORAGE_DRIVER },
     'api listening',
   );
+  if (env.BUILD_RUNNER === 'mock') logger.warn('BUILD_RUNNER=mock: builds are simulated');
 
   const shutdown = (signal: string) => {
     logger.info({ signal }, 'shutting down');

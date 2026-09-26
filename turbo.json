@@ -22,6 +22,7 @@
       "passThroughEnv": ["DATABASE_URL", "REDIS_URL", "TEST_LOG_LEVEL"]
     },
     "dev": {
+      "dependsOn": ["^build", "generate"],
       "cache": false,
       "persistent": true
     }

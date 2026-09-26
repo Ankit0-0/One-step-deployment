@@ -1,5 +1,5 @@
 import { Counter, Histogram, type Registry } from 'prom-client';
-import type { DeploymentStatus } from '@osd/shared';
+import { DEPLOYMENT_STATUSES, TERMINAL_STATUSES, type DeploymentStatus } from '@osd/shared';
 
 export interface DeploymentMetrics {
   /** Every status a deployment enters (QUEUED on create, then each transition). */
@@ -21,6 +21,10 @@ export function createDeploymentMetrics(registry: Registry): DeploymentMetrics {
     buckets: [5, 15, 30, 60, 120, 300, 600, 900],
     registers: [registry],
   });
+  // Export every series at 0 from startup: increase()/rate() can't see the first event on a
+  // series that appears with value 1, so dashboards would under-count fresh deployments.
+  for (const status of DEPLOYMENT_STATUSES) byStatus.inc({ status }, 0);
+  for (const status of TERMINAL_STATUSES) duration.zero({ status });
   return {
     statusChanged: (status) => byStatus.inc({ status }),
     buildFinished: (status, ms) => duration.observe({ status }, ms / 1000),

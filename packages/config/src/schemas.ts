@@ -92,8 +92,22 @@ const dockerRunner = z.object({
   WORKER_CPUS: z.string().default('1'),
 });
 
-/** BUILD_RUNNER=ecs runs builds as Fargate tasks; docker runs them locally for dev/tests. */
-export const runnerSchema = z.discriminatedUnion('BUILD_RUNNER', [ecsRunner, dockerRunner]);
+/** Simulated builds (no container, no git) for e2e tests and UI work; refused in production. */
+const mockRunner = z.object({
+  BUILD_RUNNER: z.literal('mock'),
+  /** Delay between simulated build steps. */
+  MOCK_BUILD_STEP_MS: z.coerce.number().int().min(0).max(10_000).default(400),
+});
+
+/**
+ * BUILD_RUNNER=ecs runs builds as Fargate tasks; docker runs them locally for dev/tests;
+ * mock simulates them without running anything.
+ */
+export const runnerSchema = z.discriminatedUnion('BUILD_RUNNER', [
+  ecsRunner,
+  dockerRunner,
+  mockRunner,
+]);
 
 const emailConsole = z.object({
   EMAIL_DRIVER: z.literal('console'),
@@ -144,7 +158,11 @@ export const apiEnvSchema = baseSchema
   })
   .and(storageSchema)
   .and(runnerSchema)
-  .and(emailSchema);
+  .and(emailSchema)
+  .refine((env) => !(env.NODE_ENV === 'production' && env.BUILD_RUNNER === 'mock'), {
+    message: 'BUILD_RUNNER=mock is for development and tests only',
+    path: ['BUILD_RUNNER'],
+  });
 
 /** The build worker never receives database credentials. */
 export const workerEnvSchema = baseSchema

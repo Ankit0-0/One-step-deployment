@@ -8,8 +8,5 @@
 !**/.env.example
 .git
 .github
-api-server
-build-server
-s3-reverse-proxy
-frontend-nextjs
-static
+e2e/.artifacts
+infra/aws/out

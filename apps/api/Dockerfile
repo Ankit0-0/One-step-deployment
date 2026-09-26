@@ -11,6 +11,12 @@ RUN pnpm turbo run build --filter=@osd/api...
 # Standalone production node_modules (includes @osd/db's generated Prisma client).
 RUN pnpm --filter=@osd/api deploy --legacy --prod /out
 
+# One-off database migrations (has the Prisma CLI; the runtime image doesn't):
+#   docker build -f apps/api/Dockerfile --target migrate -t osd/migrate .
+#   docker run --rm -e DATABASE_URL=... osd/migrate
+FROM build AS migrate
+CMD ["pnpm", "db:migrate"]
+
 FROM node:22-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app

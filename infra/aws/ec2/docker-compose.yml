@@ -1,0 +1,66 @@
+# Single EC2 host: Caddy (TLS, wildcard cert) → web, api, proxy. Redis runs here too; Postgres is RDS.
+# Builds run as Fargate tasks (BUILD_RUNNER=ecs) and publish events to this Redis.
+# Usage (on the host, from this folder): cp .env.example .env && edit, then `docker compose up -d`.
+name: osd
+
+x-app: &app
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: '20m', max-file: '5' }
+
+services:
+  caddy:
+    <<: *app
+    build:
+      context: .
+      dockerfile: caddy.Dockerfile
+    image: osd/caddy:local
+    environment:
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+      # Route53 credentials come from the instance profile.
+      AWS_REGION: ${AWS_REGION}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+  api:
+    <<: *app
+    image: ${ECR_REGISTRY}/osd/api:${IMAGE_TAG}
+    env_file: api.env
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    depends_on: [redis]
+
+  proxy:
+    <<: *app
+    image: ${ECR_REGISTRY}/osd/proxy:${IMAGE_TAG}
+    env_file: proxy.env
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    depends_on: [redis]
+
+  web:
+    <<: *app
+    # Built with --build-arg NEXT_PUBLIC_API_URL=https://api.${ROOT_DOMAIN} (values are inlined).
+    image: ${ECR_REGISTRY}/osd/web:${IMAGE_TAG}
+
+  redis:
+    <<: *app
+    image: redis:7-alpine
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD}', '--appendonly', 'yes']
+    # Published on the private IP only, for the Fargate build workers (restrict with a security group).
+    ports:
+      - '${PRIVATE_IP}:6379:6379'
+    volumes:
+      - redis-data:/data
+
+volumes:
+  caddy-data:
+  caddy-config:
+  redis-data:

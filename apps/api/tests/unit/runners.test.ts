@@ -1,11 +1,14 @@
 import { RunTaskCommand, StopTaskCommand } from '@aws-sdk/client-ecs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { workerEventSchema, type WorkerEvent } from '@osd/shared';
+import { MemoryObjectStore } from '@osd/storage';
 import {
   DockerRunner,
   parseMemory,
   type DockerApi,
 } from '../../src/modules/runners/docker-runner.js';
 import { EcsRunner } from '../../src/modules/runners/ecs-runner.js';
+import { MockRunner } from '../../src/modules/runners/mock-runner.js';
 
 const input = {
   deploymentId: 'cm1abcdefghijklmnopqrstuv',
@@ -178,5 +181,51 @@ describe('EcsRunner', () => {
     await new EcsRunner(client, options).stop('arn:1');
     expect(sent[0]).toBeInstanceOf(StopTaskCommand);
     expect((sent[0] as StopTaskCommand).input).toMatchObject({ cluster: 'builds', task: 'arn:1' });
+  });
+});
+
+describe('MockRunner', () => {
+  const deploymentId = 'cm1abcdefghijklmnopqrstuv';
+
+  function setup(stepMs = 0) {
+    const events: WorkerEvent[] = [];
+    const channels = new Set<string>();
+    const sink = {
+      publish: (channel: string, message: string) => {
+        channels.add(channel);
+        events.push(workerEventSchema.parse(JSON.parse(message)));
+        return Promise.resolve(1);
+      },
+    };
+    const store = new MemoryObjectStore();
+    const runner = new MockRunner({ sink, store, stepMs });
+    return { runner, events, channels, store };
+  }
+
+  const statuses = (events: WorkerEvent[]) =>
+    events.flatMap((e) => (e.type === 'status' ? [e.status] : []));
+
+  it('publishes valid worker events through to READY and writes a site', async () => {
+    const { runner, events, channels, store } = setup();
+    expect(await runner.start({ ...input, deploymentId })).toEqual({ ref: deploymentId });
+    await vi.waitFor(() => expect(statuses(events)).toContain('READY'));
+
+    expect(statuses(events)).toEqual(['BUILDING', 'UPLOADING', 'READY']);
+    expect(channels).toEqual(new Set([`deployment:${deploymentId}`]));
+    expect(events.filter((e) => e.type === 'log').length).toBeGreaterThan(5);
+    const page = store.objects.get(`deployments/${deploymentId}/index.html`);
+    expect(page?.contentType).toBe('text/html; charset=utf-8');
+  });
+
+  it('stops publishing when canceled', async () => {
+    const { runner, store, events } = setup(20);
+    await runner.start({ ...input, deploymentId });
+    await vi.waitFor(() => expect(statuses(events)).toContain('BUILDING'));
+    await runner.stop(deploymentId);
+    const count = events.length;
+    await new Promise((r) => setTimeout(r, 200));
+    expect(events.length).toBe(count);
+    expect(statuses(events)).not.toContain('READY');
+    expect(store.objects.size).toBe(0);
   });
 });

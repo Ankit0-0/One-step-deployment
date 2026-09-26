@@ -10,3 +10,4 @@ build-server
 s3-reverse-proxy
 frontend-nextjs
 static
+packages/db/generated

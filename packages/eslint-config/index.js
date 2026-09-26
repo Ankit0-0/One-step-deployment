@@ -9,7 +9,7 @@ import tseslint from 'typescript-eslint';
  */
 export function node({ tsconfigRootDir }) {
   return tseslint.config(
-    { ignores: ['dist/**', 'coverage/**', 'node_modules/**', '*.config.*'] },
+    { ignores: ['dist/**', 'coverage/**', 'node_modules/**', 'generated/**', '*.config.*'] },
     js.configs.recommended,
     ...tseslint.configs.recommendedTypeChecked,
     {
@@ -29,7 +29,17 @@ export function node({ tsconfigRootDir }) {
     },
     {
       files: ['**/*.test.ts', 'tests/**/*.ts'],
-      rules: { '@typescript-eslint/no-unsafe-assignment': 'off' },
+      rules: {
+        '@typescript-eslint/no-unsafe-assignment': 'off',
+        // supertest response bodies are `any` by design.
+        '@typescript-eslint/no-unsafe-member-access': 'off',
+        '@typescript-eslint/no-unsafe-call': 'off',
+        '@typescript-eslint/no-unsafe-return': 'off',
+        '@typescript-eslint/no-unsafe-argument': 'off',
+        '@typescript-eslint/require-await': 'off',
+        '@typescript-eslint/unbound-method': 'off',
+        '@typescript-eslint/no-non-null-assertion': 'off',
+      },
     },
     prettier,
   );

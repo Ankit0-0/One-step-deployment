@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/.turbo
+**/.next
+**/coverage
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.github
+api-server
+build-server
+s3-reverse-proxy
+frontend-nextjs
+static

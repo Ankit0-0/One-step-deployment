@@ -14,12 +14,18 @@ export interface RunningApi {
 }
 
 /**
- * HTTP + socket.io + worker event ingestion + stale-build sweeper.
+ * HTTP + socket.io + worker event ingestion + stale-build sweeper + expired-guest cleanup.
  * `subscriber` is a dedicated Redis connection for pub/sub.
  */
 export async function startApi(
   ctx: AppContext,
-  options: { port: number; subscriber: Redis; staleAfterMs: number; sweepIntervalMs?: number },
+  options: {
+    port: number;
+    subscriber: Redis;
+    staleAfterMs: number;
+    sweepIntervalMs?: number;
+    guestCleanupIntervalMs?: number;
+  },
 ): Promise<RunningApi> {
   const http = createServer(createApp(ctx));
   const io = attachRealtime(http, {
@@ -46,6 +52,16 @@ export async function startApi(
   }, options.sweepIntervalMs ?? 60_000);
   sweeper.unref();
 
+  const runGuestCleanup = () => {
+    ctx.guestCleanup
+      .run()
+      .then((n) => n > 0 && ctx.logger.info({ count: n }, 'deleted expired guest accounts'))
+      .catch((err: unknown) => ctx.logger.error({ err }, 'guest cleanup failed'));
+  };
+  const guestCleaner = setInterval(runGuestCleanup, options.guestCleanupIntervalMs ?? 10 * 60_000);
+  guestCleaner.unref();
+  runGuestCleanup();
+
   await new Promise<void>((resolve) => http.listen(options.port, resolve));
 
   return {
@@ -54,6 +70,7 @@ export async function startApi(
     ingestor,
     async close() {
       clearInterval(sweeper);
+      clearInterval(guestCleaner);
       await new Promise<void>((resolve) => {
         void io.close(() => resolve());
       });

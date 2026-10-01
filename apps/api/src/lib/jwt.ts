@@ -3,19 +3,20 @@ import jwt from 'jsonwebtoken';
 const ISSUER = 'osd-api';
 
 export interface SessionTokens {
-  sign(userId: string): string;
+  /** `ttlSeconds` overrides the default lifetime (guest sessions are shorter). */
+  sign(userId: string, ttlSeconds?: number): string;
   /** Returns the user id, or null for any invalid, expired or tampered token. */
   verify(token: string | undefined): string | null;
 }
 
 export function createSessionTokens(secret: string, ttlSeconds: number): SessionTokens {
   return {
-    sign: (userId) =>
+    sign: (userId, ttl = ttlSeconds) =>
       jwt.sign({}, secret, {
         algorithm: 'HS256',
         subject: userId,
         issuer: ISSUER,
-        expiresIn: ttlSeconds,
+        expiresIn: ttl,
       }),
     verify: (token) => {
       if (!token) return null;

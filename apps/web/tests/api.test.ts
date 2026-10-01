@@ -13,7 +13,13 @@ describe('api client', () => {
   it('sends credentials and JSON bodies, and unwraps the response', async () => {
     const fetchImpl = vi.fn(async () =>
       json(200, {
-        user: { id: 'usr00000000001', email: 'a@b.dev', createdAt: '2026-09-26T10:00:00.000Z' },
+        user: {
+          id: 'usr00000000001',
+          email: 'a@b.dev',
+          createdAt: '2026-09-26T10:00:00.000Z',
+          isGuest: false,
+          expiresAt: null,
+        },
       }),
     );
     const api = createApiClient('http://api.test', fetchImpl);
@@ -24,6 +30,29 @@ describe('api client', () => {
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'a@b.dev', code: '123456' }),
+    });
+  });
+
+  it('signs in as a guest with an empty POST', async () => {
+    const fetchImpl = vi.fn(async () =>
+      json(201, {
+        user: {
+          id: 'usr00000000002',
+          email: 'guest-0123456789abcdef@guest.invalid',
+          createdAt: '2026-09-26T10:00:00.000Z',
+          isGuest: true,
+          expiresAt: '2026-09-27T10:00:00.000Z',
+        },
+      }),
+    );
+    const api = createApiClient('http://api.test', fetchImpl);
+    const user = await api.loginAsGuest();
+    expect(user.isGuest).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledWith('http://api.test/auth/guest', {
+      method: 'POST',
+      credentials: 'include',
+      headers: undefined,
+      body: undefined,
     });
   });
 

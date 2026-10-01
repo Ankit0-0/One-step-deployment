@@ -76,6 +76,9 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = (...a
       request(userRes, '/auth/verify', { method: 'POST', body: { email, code } }).then(
         (r) => r.user,
       ),
+    /** Signs in as a fresh throwaway guest account. */
+    loginAsGuest: (): Promise<UserDto> =>
+      request(userRes, '/auth/guest', { method: 'POST' }).then((r) => r.user),
     me: (): Promise<UserDto> => request(userRes, '/auth/me').then((r) => r.user),
     logout: () => request(null, '/auth/logout', { method: 'POST' }),
 

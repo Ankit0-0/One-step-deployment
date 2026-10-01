@@ -1,7 +1,9 @@
 import { Readable } from 'node:stream';
 import {
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  ListObjectsV2Command,
   NoSuchKey,
   PutObjectCommand,
   S3Client,
@@ -28,6 +30,8 @@ export interface PutObjectInput {
 export interface ObjectStore {
   get(key: string): Promise<StoredObject | null>;
   put(input: PutObjectInput): Promise<void>;
+  /** Deletes every object whose key starts with `prefix`; returns how many were deleted. */
+  deletePrefix(prefix: string): Promise<number>;
   /** Throws when the bucket is unreachable (used by /readyz). */
   ping(): Promise<void>;
 }
@@ -88,6 +92,33 @@ export class S3ObjectStore implements ObjectStore {
     );
   }
 
+  async deletePrefix(prefix: string): Promise<number> {
+    if (!prefix) throw new Error('Refusing to delete with an empty prefix');
+    let deleted = 0;
+    let token: string | undefined;
+    do {
+      // ListObjectsV2 pages hold at most 1000 keys, which is also DeleteObjects' limit.
+      const page = await this.client.send(
+        new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: token }),
+      );
+      const keys = (page.Contents ?? []).flatMap((o) => (o.Key ? [{ Key: o.Key }] : []));
+      if (keys.length > 0) {
+        const res = await this.client.send(
+          new DeleteObjectsCommand({
+            Bucket: this.bucket,
+            Delete: { Objects: keys, Quiet: true },
+          }),
+        );
+        if (res.Errors?.length) {
+          throw new Error(`Failed to delete ${res.Errors.length} objects under ${prefix}`);
+        }
+        deleted += keys.length;
+      }
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+    return deleted;
+  }
+
   async ping(): Promise<void> {
     await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
   }
@@ -125,6 +156,18 @@ export class MemoryObjectStore implements ObjectStore {
       contentType: input.contentType,
       cacheControl: input.cacheControl,
     });
+  }
+
+  deletePrefix(prefix: string): Promise<number> {
+    if (!prefix) return Promise.reject(new Error('Refusing to delete with an empty prefix'));
+    let deleted = 0;
+    for (const key of this.objects.keys()) {
+      if (key.startsWith(prefix)) {
+        this.objects.delete(key);
+        deleted++;
+      }
+    }
+    return Promise.resolve(deleted);
   }
 
   ping(): Promise<void> {

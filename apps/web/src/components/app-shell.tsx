@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from '@/hooks/use-session';
 import { ApiError } from '@/lib/api';
+import { formatRelative } from '@/lib/format';
 import { useApi } from '@/lib/api-context';
 
 /** Layout for signed-in pages: redirects to /login when there is no session. */
@@ -40,7 +41,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-3 text-sm">
             {session.data ? (
               <>
-                <span className="hidden text-muted-foreground sm:inline">{session.data.email}</span>
+                <span className="hidden text-muted-foreground sm:inline">
+                  {session.data.isGuest ? 'Guest' : session.data.email}
+                </span>
                 <Button variant="ghost" size="sm" onClick={() => void logout()}>
                   Log out
                 </Button>
@@ -51,6 +54,16 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </header>
+      {session.data?.isGuest && session.data.expiresAt && (
+        <div className="border-b bg-muted px-4 py-2 text-center text-sm text-muted-foreground">
+          You are using a guest account. It and everything in it will be deleted{' '}
+          {formatRelative(session.data.expiresAt)}.{' '}
+          <button type="button" className="underline" onClick={() => void logout()}>
+            Sign in with email
+          </button>{' '}
+          for a permanent account.
+        </div>
+      )}
       <main className="mx-auto max-w-6xl px-4 py-8">
         {session.data ? (
           children

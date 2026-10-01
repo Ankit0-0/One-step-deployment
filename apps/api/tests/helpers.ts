@@ -59,6 +59,9 @@ export function testConfig(overrides: Partial<ApiConfig> = {}): ApiConfig {
     cookieSecure: false,
     siteUrlTemplate: 'http://{slug}.localhost:8000',
     maxConcurrentBuilds: 2,
+    guestLoginEnabled: true,
+    guestTtlSeconds: 3600,
+    guestMaxProjects: 3,
     trustProxy: false,
     // Fresh rate-limit counters per test env.
     rateLimitPrefix: `test:${randomUUID()}:`,

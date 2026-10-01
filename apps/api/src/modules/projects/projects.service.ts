@@ -1,12 +1,13 @@
 import { Prisma, type Project } from '@osd/db';
 import type { CreateProjectBody, ProjectDto, UpdateProjectBody } from '@osd/shared';
-import { conflict, notFound } from '../../lib/errors.js';
+import { conflict, forbidden, notFound } from '../../lib/errors.js';
 import type { ProjectsRepository } from './projects.repository.js';
 
 export class ProjectsService {
   constructor(
     private readonly repo: ProjectsRepository,
     private readonly siteUrlTemplate: string,
+    private readonly guestMaxProjects: number,
   ) {}
 
   siteUrl(slug: string): string {
@@ -36,14 +37,21 @@ export class ProjectsService {
   }
 
   async create(userId: string, body: CreateProjectBody): Promise<Project> {
+    let project: Project | null;
     try {
-      return await this.repo.create(userId, body);
+      project = await this.repo.create(userId, body, this.guestMaxProjects);
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         throw conflict('That slug is already taken');
       }
       throw err;
     }
+    if (!project) {
+      throw forbidden(
+        `Guest accounts can have at most ${this.guestMaxProjects} projects. Sign in with email for more.`,
+      );
+    }
+    return project;
   }
 
   async update(userId: string, id: string, body: UpdateProjectBody): Promise<Project> {

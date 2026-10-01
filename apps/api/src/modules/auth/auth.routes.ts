@@ -51,6 +51,24 @@ export function authRoutes(deps: {
     },
   );
 
+  router.post(
+    '/guest',
+    ipRateLimit(deps.redis, {
+      prefix: `${deps.rateLimitPrefix}guest-ip:`,
+      windowMs: 60 * 60 * 1000,
+      limit: 10,
+    }),
+    async (_req, res) => {
+      const user = await deps.auth.loginAsGuest();
+      const ttlSeconds = deps.auth.sessionTtlSeconds(user, deps.cookie.ttlSeconds);
+      setSessionCookie(res, deps.tokens.sign(user.id, ttlSeconds), {
+        ...deps.cookie,
+        ttlSeconds,
+      });
+      res.status(201).json({ user: toUserDto(user) });
+    },
+  );
+
   router.get('/me', requireAuth(deps.tokens), async (_req, res) => {
     const user = await deps.auth.me(currentUserId(res));
     res.json({ user: toUserDto(user) });

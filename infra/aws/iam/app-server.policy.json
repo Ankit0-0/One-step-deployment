@@ -35,6 +35,12 @@
       "Resource": "arn:aws:s3:::${BUCKET}/deployments/*"
     },
     {
+      "Sid": "DeleteExpiredGuestFiles",
+      "Effect": "Allow",
+      "Action": "s3:DeleteObject",
+      "Resource": "arn:aws:s3:::${BUCKET}/deployments/*"
+    },
+    {
       "Sid": "ReadinessHeadBucket",
       "Effect": "Allow",
       "Action": "s3:ListBucket",

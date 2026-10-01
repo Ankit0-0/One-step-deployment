@@ -94,26 +94,27 @@ Every service validates its environment with zod (`packages/config`) and refuses
 missing or invalid value. The checked-in `.env.example` files are the full reference, and a test
 keeps them valid.
 
-| Variable                                                  | Used by                    | Notes                                                                                                                      |
-| --------------------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`, `LOG_LEVEL`                                   | all                        | JSON logs; pretty in development                                                                                           |
-| `DATABASE_URL`                                            | api, proxy                 | Postgres. Never given to the worker                                                                                        |
-| `REDIS_URL`                                               | api, proxy, worker         | Must include a password (`redis://:pass@host:6379`, or `rediss://`)                                                        |
-| `STORAGE_DRIVER`                                          | api, proxy, worker         | `s3` (AWS credential chain + `AWS_REGION`) or `minio` (`S3_*` keys)                                                        |
-| `STORAGE_BUCKET`                                          | api, proxy, worker         | Sites live under `deployments/{deploymentId}/`                                                                             |
-| `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | minio only                 | Local S3-compatible storage                                                                                                |
-| `WEB_ORIGIN`                                              | api                        | Only origin allowed by CORS and socket.io                                                                                  |
-| `ROOT_DOMAIN`, `SITE_URL_TEMPLATE`                        | api, proxy                 | Sites at `{slug}.{ROOT_DOMAIN}`; template overrides the shown URL                                                          |
-| `JWT_SECRET`, `JWT_TTL_SECONDS`                           | api                        | Session cookie (httpOnly, SameSite=Lax); secret ≥ 32 chars                                                                 |
-| `COOKIE_SECURE`, `COOKIE_DOMAIN`, `TRUST_PROXY`           | api (proxy: `TRUST_PROXY`) | Secure cookies in production; trust Caddy's forwarded headers                                                              |
-| `EMAIL_DRIVER`                                            | api                        | `console` (logs the code) or `resend` (`RESEND_API_KEY`, `EMAIL_FROM`)                                                     |
-| `BUILD_RUNNER`                                            | api                        | `ecs` (`ECS_*`, `AWS_REGION`), `docker` (`BUILD_WORKER_IMAGE`, `DOCKER_NETWORK`, `WORKER_*`) or `mock` (not in production) |
-| `BUILD_TIMEOUT_MS`, `MAX_CONCURRENT_BUILDS_PER_USER`      | api, worker                | Default 10 minutes and 2 builds                                                                                            |
-| `MAX_OUTPUT_BYTES`, `WORK_DIR`                            | worker                     | Output size limit and scratch directory                                                                                    |
-| `DEPLOYMENT_ID`, `GIT_URL`, `REQUEST_ID`                  | worker                     | Injected per build by the runner                                                                                           |
-| `CACHE_TTL_SECONDS`                                       | proxy                      | Slug → deployment cache in Redis                                                                                           |
-| `METRICS_TOKEN`                                           | api, proxy                 | When set, `/metrics` requires `Authorization: Bearer <token>`                                                              |
-| `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_ROOT_DOMAIN`          | web                        | Inlined at build time (Docker build args)                                                                                  |
+| Variable                                                         | Used by                    | Notes                                                                                                                                                                 |
+| ---------------------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`, `LOG_LEVEL`                                          | all                        | JSON logs; pretty in development                                                                                                                                      |
+| `DATABASE_URL`                                                   | api, proxy                 | Postgres. Never given to the worker                                                                                                                                   |
+| `REDIS_URL`                                                      | api, proxy, worker         | Must include a password (`redis://:pass@host:6379`, or `rediss://`)                                                                                                   |
+| `STORAGE_DRIVER`                                                 | api, proxy, worker         | `s3` (AWS credential chain + `AWS_REGION`) or `minio` (`S3_*` keys)                                                                                                   |
+| `STORAGE_BUCKET`                                                 | api, proxy, worker         | Sites live under `deployments/{deploymentId}/`                                                                                                                        |
+| `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`        | minio only                 | Local S3-compatible storage                                                                                                                                           |
+| `WEB_ORIGIN`                                                     | api                        | Only origin allowed by CORS and socket.io                                                                                                                             |
+| `ROOT_DOMAIN`, `SITE_URL_TEMPLATE`                               | api, proxy                 | Sites at `{slug}.{ROOT_DOMAIN}`; template overrides the shown URL                                                                                                     |
+| `JWT_SECRET`, `JWT_TTL_SECONDS`                                  | api                        | Session cookie (httpOnly, SameSite=Lax); secret ≥ 32 chars                                                                                                            |
+| `COOKIE_SECURE`, `COOKIE_DOMAIN`, `TRUST_PROXY`                  | api (proxy: `TRUST_PROXY`) | Secure cookies in production; trust Caddy's forwarded headers                                                                                                         |
+| `EMAIL_DRIVER`                                                   | api                        | `console` (logs the code) or `resend` (`RESEND_API_KEY`, `EMAIL_FROM`)                                                                                                |
+| `BUILD_RUNNER`                                                   | api                        | `ecs` (`ECS_*`, `AWS_REGION`), `docker` (`BUILD_WORKER_IMAGE`, `DOCKER_NETWORK`, `WORKER_*`) or `mock` (not in production)                                            |
+| `BUILD_TIMEOUT_MS`, `MAX_CONCURRENT_BUILDS_PER_USER`             | api, worker                | Default 10 minutes and 2 builds                                                                                                                                       |
+| `GUEST_LOGIN_ENABLED`, `GUEST_TTL_SECONDS`, `GUEST_MAX_PROJECTS` | api                        | "Login as guest" creates a throwaway account; after the TTL (default 24h) it is deleted with its projects, deployments, logs and files. Guests get at most 3 projects |
+| `MAX_OUTPUT_BYTES`, `WORK_DIR`                                   | worker                     | Output size limit and scratch directory                                                                                                                               |
+| `DEPLOYMENT_ID`, `GIT_URL`, `REQUEST_ID`                         | worker                     | Injected per build by the runner                                                                                                                                      |
+| `CACHE_TTL_SECONDS`                                              | proxy                      | Slug → deployment cache in Redis                                                                                                                                      |
+| `METRICS_TOKEN`                                                  | api, proxy                 | When set, `/metrics` requires `Authorization: Bearer <token>`                                                                                                         |
+| `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_ROOT_DOMAIN`                 | web                        | Inlined at build time (Docker build args)                                                                                                                             |
 
 ## Deploying to AWS
 
@@ -154,11 +155,11 @@ docker build -f apps/api/Dockerfile --target migrate -t $REGISTRY/osd/migrate:$I
 
 **3. IAM roles (least privilege)**
 
-| Role                                | Trust       | Policy                                    | Grants                                                                                   |
-| ----------------------------------- | ----------- | ----------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `osd-build-worker-task`             | `ecs-tasks` | `build-worker-task-role.policy.json`      | `s3:PutObject` on `$BUCKET/deployments/*` only                                           |
-| `osd-build-worker-execution`        | `ecs-tasks` | `build-worker-execution-role.policy.json` | Pull the worker image, write its logs, read the Redis URL param                          |
-| `osd-app-server` (instance profile) | `ec2`       | `app-server.policy.json`                  | RunTask/StopTask on the worker, PassRole, read `deployments/*`, Route53 DNS-01 for Caddy |
+| Role                                | Trust       | Policy                                    | Grants                                                                                              |
+| ----------------------------------- | ----------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `osd-build-worker-task`             | `ecs-tasks` | `build-worker-task-role.policy.json`      | `s3:PutObject` on `$BUCKET/deployments/*` only                                                      |
+| `osd-build-worker-execution`        | `ecs-tasks` | `build-worker-execution-role.policy.json` | Pull the worker image, write its logs, read the Redis URL param                                     |
+| `osd-app-server` (instance profile) | `ec2`       | `app-server.policy.json`                  | RunTask/StopTask on the worker, PassRole, read and delete `deployments/*`, Route53 DNS-01 for Caddy |
 
 ```sh
 cd infra/aws/out/iam

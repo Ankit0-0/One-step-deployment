@@ -10,6 +10,7 @@ import type { CookieConfig } from './lib/session-cookie.js';
 import { AuthRepository } from './modules/auth/auth.repository.js';
 import { AuthService } from './modules/auth/auth.service.js';
 import type { EmailSender } from './modules/auth/email.js';
+import { GuestCleanup } from './modules/auth/guest-cleanup.js';
 import { DeploymentsRepository } from './modules/deployments/deployments.repository.js';
 import { DeploymentsService } from './modules/deployments/deployments.service.js';
 import { DeploymentHub } from './modules/deployments/hub.js';
@@ -25,6 +26,10 @@ export interface ApiConfig {
   cookieDomain?: string;
   siteUrlTemplate: string;
   maxConcurrentBuilds: number;
+  guestLoginEnabled: boolean;
+  /** Lifetime of a guest account; it is deleted with all its data afterwards. */
+  guestTtlSeconds: number;
+  guestMaxProjects: number;
   trustProxy: boolean;
   metricsToken?: string;
   /** Redis key prefix for rate-limit counters. */
@@ -49,6 +54,7 @@ export interface AppContext extends ApiDeps {
   httpMetrics: HttpMetrics;
   repos: { deployments: DeploymentsRepository; projects: ProjectsRepository };
   services: { auth: AuthService; projects: ProjectsService; deployments: DeploymentsService };
+  guestCleanup: GuestCleanup;
 }
 
 /** Wires repositories and services. Everything external (db, redis, storage, runner, email) is injected. */
@@ -65,8 +71,14 @@ export function createContext(deps: ApiDeps): AppContext {
     new FixedWindowLimiter(redis, `${config.rateLimitPrefix}code-email:`, 5, 15 * 60),
     config.jwtSecret,
     logger,
+    { enabled: config.guestLoginEnabled, ttlSeconds: config.guestTtlSeconds },
   );
-  const projects = new ProjectsService(projectsRepo, config.siteUrlTemplate);
+  const projects = new ProjectsService(
+    projectsRepo,
+    config.siteUrlTemplate,
+    config.guestMaxProjects,
+  );
+  const invalidateSiteCache = (key: string) => redis.del(key);
   const deployments = new DeploymentsService({
     repo: deploymentsRepo,
     projects: projectsRepo,
@@ -74,7 +86,7 @@ export function createContext(deps: ApiDeps): AppContext {
     hub,
     metrics: createDeploymentMetrics(httpMetrics.registry),
     logger,
-    invalidateSiteCache: (key) => redis.del(key),
+    invalidateSiteCache,
     maxConcurrentBuilds: config.maxConcurrentBuilds,
   });
 
@@ -90,5 +102,12 @@ export function createContext(deps: ApiDeps): AppContext {
     httpMetrics,
     repos: { deployments: deploymentsRepo, projects: projectsRepo },
     services: { auth, projects, deployments },
+    guestCleanup: new GuestCleanup({
+      prisma,
+      store: deps.store,
+      runner: deps.runner,
+      invalidateSiteCache,
+      logger,
+    }),
   };
 }

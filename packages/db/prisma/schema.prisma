@@ -34,7 +34,12 @@ model User {
   id        String    @id @default(cuid())
   email     String    @unique
   createdAt DateTime  @default(now())
+  /// Throwaway guest account: no email login, deleted with all its data after expiresAt.
+  isGuest   Boolean   @default(false)
+  expiresAt DateTime?
   projects  Project[]
+
+  @@index([isGuest, expiresAt])
 }
 
 /// One-time login code. Only a hash of the code is stored.

@@ -147,6 +147,14 @@ export const apiEnvSchema = baseSchema
       .refine((v) => v.includes('{slug}'), 'must contain {slug}')
       .optional(),
     MAX_CONCURRENT_BUILDS_PER_USER: z.coerce.number().int().min(1).default(2),
+    /** "Login as guest": throwaway accounts deleted with all their data after GUEST_TTL_SECONDS. */
+    GUEST_LOGIN_ENABLED: envBoolean.default(true),
+    GUEST_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(60)
+      .default(60 * 60 * 24),
+    GUEST_MAX_PROJECTS: z.coerce.number().int().min(1).default(3),
     TRUST_PROXY: envBoolean.default(false),
     /** When set, GET /metrics requires `Authorization: Bearer <token>`. */
     METRICS_TOKEN: z.string().min(16).optional(),

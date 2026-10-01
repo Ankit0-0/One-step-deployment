@@ -12,8 +12,23 @@ export class ProjectsRepository {
     return this.prisma.project.findFirst({ where: { id, userId } });
   }
 
-  create(userId: string, data: { name: string; slug: string; gitUrl: string }): Promise<Project> {
-    return this.prisma.project.create({ data: { ...data, userId } });
+  /**
+   * Creates the project, or returns null when the owner is a guest already at `guestLimit`.
+   * A per-user advisory lock makes the count-then-insert atomic across concurrent requests.
+   */
+  create(
+    userId: string,
+    data: { name: string; slug: string; gitUrl: string },
+    guestLimit: number,
+  ): Promise<Project | null> {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
+      const owner = await tx.user.findUnique({ where: { id: userId }, select: { isGuest: true } });
+      if (owner?.isGuest && (await tx.project.count({ where: { userId } })) >= guestLimit) {
+        return null;
+      }
+      return tx.project.create({ data: { ...data, userId } });
+    });
   }
 
   update(id: string, data: { name?: string; gitUrl?: string }): Promise<Project> {

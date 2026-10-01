@@ -27,6 +27,9 @@ export const userDtoSchema = z.object({
   id: idSchema,
   email: z.email(),
   createdAt: isoDate,
+  /** Guest accounts are throwaway: everything they own is deleted at expiresAt. */
+  isGuest: z.boolean(),
+  expiresAt: isoDate.nullable(),
 });
 export type UserDto = z.infer<typeof userDtoSchema>;
 

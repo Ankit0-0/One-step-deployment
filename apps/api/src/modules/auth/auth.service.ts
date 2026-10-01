@@ -2,7 +2,7 @@ import type { Logger } from 'pino';
 import type { User } from '@osd/db';
 import type { UserDto } from '@osd/shared';
 import { generateLoginCode, hashLoginCode, loginCodeMatches } from '../../lib/codes.js';
-import { rateLimited, unauthorized } from '../../lib/errors.js';
+import { notFound, rateLimited, unauthorized } from '../../lib/errors.js';
 import type { FixedWindowLimiter } from '../../lib/limiter.js';
 import type { AuthRepository } from './auth.repository.js';
 import type { EmailSender } from './email.js';
@@ -19,6 +19,7 @@ export class AuthService {
     private readonly emailLimiter: FixedWindowLimiter,
     private readonly secret: string,
     private readonly logger: Logger,
+    private readonly guest: { enabled: boolean; ttlSeconds: number },
     private readonly now: () => Date = () => new Date(),
   ) {}
 
@@ -43,16 +44,44 @@ export class AuthService {
     if (!loginCodeMatches(this.secret, email, code, record.codeHash))
       throw unauthorized(INVALID_CODE);
     if (!(await this.repo.consume(record.id))) throw unauthorized(INVALID_CODE);
-    return this.repo.upsertUser(email);
+    const user = await this.repo.upsertUser(email);
+    if (user.isGuest) throw unauthorized(INVALID_CODE);
+    return user;
+  }
+
+  /** Creates a fresh throwaway account; it and everything it owns are deleted after the TTL. */
+  async loginAsGuest(): Promise<User> {
+    if (!this.guest.enabled) throw notFound('Guest login');
+    const expiresAt = new Date(this.now().getTime() + this.guest.ttlSeconds * 1000);
+    const user = await this.repo.createGuest(expiresAt);
+    this.logger.info({ userId: user.id, expiresAt }, 'guest account created');
+    return user;
+  }
+
+  /** Session lifetime for a user: guests never outlive their account. */
+  sessionTtlSeconds(user: User, defaultTtl: number): number {
+    if (!user.expiresAt) return defaultTtl;
+    const left = Math.floor((user.expiresAt.getTime() - this.now().getTime()) / 1000);
+    return Math.max(1, Math.min(defaultTtl, left));
   }
 
   async me(userId: string): Promise<User> {
     const user = await this.repo.findUser(userId);
-    if (!user) throw unauthorized();
+    if (!user || isExpired(user, this.now())) throw unauthorized();
     return user;
   }
 }
 
+export function isExpired(user: User, now: Date): boolean {
+  return user.expiresAt !== null && user.expiresAt <= now;
+}
+
 export function toUserDto(user: User): UserDto {
-  return { id: user.id, email: user.email, createdAt: user.createdAt.toISOString() };
+  return {
+    id: user.id,
+    email: user.email,
+    createdAt: user.createdAt.toISOString(),
+    isGuest: user.isGuest,
+    expiresAt: user.expiresAt?.toISOString() ?? null,
+  };
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Rocket } from 'lucide-react';
+import { Loader2, Rocket, UserRound } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { authCodeSchema, emailSchema } from '@osd/shared';
@@ -30,6 +30,14 @@ export default function LoginPage() {
   });
   const verify = useMutation({
     mutationFn: () => api.verifyCode(email, code),
+    onSuccess: (user) => {
+      queryClient.setQueryData(sessionKey, user);
+      router.replace('/dashboard');
+    },
+  });
+
+  const guest = useMutation({
+    mutationFn: () => api.loginAsGuest(),
     onSuccess: (user) => {
       queryClient.setQueryData(sessionKey, user);
       router.replace('/dashboard');
@@ -85,6 +93,29 @@ export default function LoginPage() {
                 {requestCode.isPending && <Loader2 className="animate-spin" aria-hidden />}
                 Send code
               </Button>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                or
+                <span className="h-px flex-1 bg-border" />
+              </div>
+              {guest.error && <Alert variant="destructive">{guest.error.message}</Alert>}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={guest.isPending}
+                onClick={() => guest.mutate()}
+              >
+                {guest.isPending ? (
+                  <Loader2 className="animate-spin" aria-hidden />
+                ) : (
+                  <UserRound aria-hidden />
+                )}
+                Login as guest
+              </Button>
+              <p className="text-center text-xs text-muted-foreground">
+                No account needed. Guest accounts and their projects are deleted automatically.
+              </p>
             </form>
           ) : (
             <form onSubmit={submitCode} className="space-y-4" noValidate>

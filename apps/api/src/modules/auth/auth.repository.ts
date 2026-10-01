@@ -1,4 +1,7 @@
+import { randomBytes } from 'node:crypto';
 import type { AuthCode, PrismaClient, User } from '@osd/db';
+
+export const GUEST_EMAIL_DOMAIN = 'guest.invalid';
 
 export class AuthRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -41,6 +44,12 @@ export class AuthRepository {
 
   upsertUser(email: string): Promise<User> {
     return this.prisma.user.upsert({ where: { email }, update: {}, create: { email } });
+  }
+
+  /** Guests get an unroutable address (RFC 2606 .invalid), so no code can ever reach it. */
+  createGuest(expiresAt: Date): Promise<User> {
+    const email = `guest-${randomBytes(8).toString('hex')}@${GUEST_EMAIL_DOMAIN}`;
+    return this.prisma.user.create({ data: { email, isGuest: true, expiresAt } });
   }
 
   findUser(id: string): Promise<User | null> {
